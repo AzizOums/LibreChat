@@ -45,6 +45,15 @@ const aclEntrySchema: Schema<IAclEntry> = new Schema<IAclEntry>(
         message: '`permBits` must be an integer',
       },
     },
+    /**
+     * Explicit denial entry: overrides any group-level grant for the same
+     * resource. Deny entries must carry `permBits: 0` so that bitwise grant
+     * queries (`$bitsAllSet`) never match them. Currently used by KB documents
+     * for per-user access revocation.
+     */
+    deny: {
+      type: Boolean,
+    },
     roleId: {
       type: Schema.Types.ObjectId,
       ref: 'AccessRole',

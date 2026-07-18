@@ -14,6 +14,8 @@ export type AclEntry = {
   resourceId: Types.ObjectId;
   /** Permission bits for this entry */
   permBits: number;
+  /** Explicit denial that overrides group-level grants (requires permBits 0) */
+  deny?: boolean;
   /** Optional role ID for predefined roles */
   roleId?: Types.ObjectId;
   /** ID of the resource this permission is inherited from */

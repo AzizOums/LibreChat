@@ -60,6 +60,8 @@ export * from './files';
 export * from './storage';
 /* Tools */
 export * from './tools';
+/* Knowledge Base */
+export * from './kb';
 /* web search */
 export * from './web';
 /* Langfuse */

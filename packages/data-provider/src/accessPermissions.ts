@@ -49,6 +49,7 @@ export enum ResourceType {
   REMOTE_AGENT = 'remoteAgent',
   SKILL = 'skill',
   SHARED_LINK = 'sharedLink',
+  KB_DOCUMENT = 'kbDocument',
 }
 
 /**
@@ -86,6 +87,8 @@ export enum AccessRoleIds {
   SKILL_OWNER = 'skill_owner',
   SHARED_LINK_VIEWER = 'sharedLink_viewer',
   SHARED_LINK_OWNER = 'sharedLink_owner',
+  KB_DOCUMENT_VIEWER = 'kbDocument_viewer',
+  KB_DOCUMENT_OWNER = 'kbDocument_owner',
 }
 
 // ===== ZOD SCHEMAS =====
