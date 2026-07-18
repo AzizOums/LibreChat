@@ -80,6 +80,7 @@ librechat.yml
 .env*
 my.secrets
 !**/.env.example
+!.env.kb.example
 !**/.env.test.example
 cache.json
 api/data/

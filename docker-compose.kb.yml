@@ -1,0 +1,105 @@
+name: librechat-kb
+
+services:
+  api:
+    container_name: LibreChat-KB
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '${PORT:-3080}:${PORT:-3080}'
+    depends_on:
+      mongodb:
+        condition: service_started
+      vectordb:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - KB_ENABLED=true
+      - KB_DB_HOST=vectordb
+      - KB_DB_PORT=5432
+      - KB_DB_NAME=${POSTGRES_DB:-librechat_kb}
+      - KB_DB_USER=${POSTGRES_USER:-kbuser}
+      - KB_DB_PASSWORD=${POSTGRES_PASSWORD:-kbpassword}
+      - KB_EMBEDDINGS_BASE_URL=http://ollama:11434
+    volumes:
+      - kb-images:/app/client/public/images
+      - kb-uploads:/app/uploads
+      - kb-logs:/app/logs
+
+  mongodb:
+    container_name: kb-mongodb
+    image: mongo:8.0.20
+    restart: unless-stopped
+    volumes:
+      - kb-mongodb:/data/db
+    command: mongod --noauth
+
+  meilisearch:
+    container_name: kb-meilisearch
+    image: getmeili/meilisearch:v1.35.1
+    restart: unless-stopped
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-kb_meili_master_key_change_me}
+    volumes:
+      - kb-meili:/meili_data
+
+  vectordb:
+    container_name: kb-vectordb
+    image: pgvector/pgvector:0.8.0-pg15-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-librechat_kb}
+      POSTGRES_USER: ${POSTGRES_USER:-kbuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kbpassword}
+    volumes:
+      - kb-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    container_name: kb-ollama
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - kb-ollama:/root/.ollama
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  ollama-init:
+    container_name: kb-ollama-init
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ['ollama', 'pull', '${KB_EMBEDDINGS_MODEL:-nomic-embed-text}']
+    restart: 'no'
+
+volumes:
+  kb-images:
+  kb-uploads:
+  kb-logs:
+  kb-mongodb:
+  kb-meili:
+  kb-pgdata:
+  kb-ollama:
