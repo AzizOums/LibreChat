@@ -445,6 +445,18 @@ export const toolFavorites = () => `${BASE_URL}/api/user/settings/favorites/tool
 export const toolFavorite = (itemType: string, itemId: string) =>
   `${toolFavorites()}/${itemType}/${encodeURIComponent(itemId)}`;
 
+/* Knowledge Base (admin) */
+export const adminKb = () => `${BASE_URL}/api/admin/kb`;
+export const adminKbDocuments = () => `${adminKb()}/documents`;
+export const adminKbDocument = (fileId: string) =>
+  `${adminKbDocuments()}/${encodeURIComponent(fileId)}`;
+export const adminKbDocumentRetry = (fileId: string) => `${adminKbDocument(fileId)}/retry`;
+export const adminKbDocumentAccess = (fileId: string) => `${adminKbDocument(fileId)}/access`;
+export const adminKbDocumentGroup = (fileId: string, groupId: string) =>
+  `${adminKbDocument(fileId)}/groups/${encodeURIComponent(groupId)}`;
+export const adminKbDocumentUser = (fileId: string, userId: string) =>
+  `${adminKbDocument(fileId)}/users/${encodeURIComponent(userId)}`;
+
 /* Roles */
 export const roles = () => `${BASE_URL}/api/roles`;
 export const adminRoles = () => `${BASE_URL}/api/admin/roles`;

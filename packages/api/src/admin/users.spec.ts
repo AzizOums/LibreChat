@@ -58,6 +58,11 @@ function createDeps(overrides: Partial<AdminUsersDeps> = {}): AdminUsersDeps {
       .mockResolvedValue({ deletedCount: 1, message: 'User was deleted successfully.' }),
     deleteConfig: jest.fn().mockResolvedValue(null),
     deleteAclEntries: jest.fn().mockResolvedValue(undefined),
+    registerUser: jest.fn().mockResolvedValue({ status: 200, message: 'ok' }),
+    createInviteToken: jest.fn().mockResolvedValue('invite-token'),
+    emailEnabled: jest.fn().mockReturnValue(false),
+    sendInviteEmail: jest.fn().mockResolvedValue(undefined),
+    clientDomain: 'http://localhost:3080',
     ...overrides,
   };
 }
@@ -500,6 +505,115 @@ describe('createAdminUsersHandlers', () => {
 
       expect(status).toHaveBeenCalledWith(500);
       expect(json).toHaveBeenCalledWith({ error: 'Failed to delete user' });
+    });
+  });
+
+  describe('createUser', () => {
+    it('rejects an invalid email', async () => {
+      const handlers = createAdminUsersHandlers(createDeps());
+      const { req, res, status } = createReqRes();
+      Object.assign(req, { body: { email: 'not-an-email' } });
+      await handlers.createUser(req, res);
+      expect(status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 409 when the email is already used', async () => {
+      const deps = createDeps({
+        findUsers: jest.fn().mockResolvedValue([mockUser()]),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes();
+      Object.assign(req, { body: { email: 'test@example.com' } });
+      await handlers.createUser(req, res);
+      expect(status).toHaveBeenCalledWith(409);
+      expect(deps.registerUser).not.toHaveBeenCalled();
+    });
+
+    it('registers the user with a generated password and requested role', async () => {
+      const created = mockUser({ email: 'new@example.com', role: 'ADMIN' });
+      const findUsers = jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([created]);
+      const deps = createDeps({ findUsers });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes();
+      Object.assign(req, { body: { email: 'New@Example.com', role: 'ADMIN' } });
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      const [registered, additionalData] = (deps.registerUser as jest.Mock).mock.calls[0];
+      expect(registered.email).toBe('new@example.com');
+      expect(registered.password.length).toBeGreaterThanOrEqual(24);
+      expect(additionalData).toEqual({ role: 'ADMIN', emailVerified: true });
+      expect(json).toHaveBeenCalledWith({
+        user: expect.objectContaining({ email: 'new@example.com', role: 'ADMIN' }),
+      });
+    });
+
+    it('propagates registration failures', async () => {
+      const deps = createDeps({
+        registerUser: jest.fn().mockResolvedValue({ status: 403, message: 'Domain not allowed' }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes();
+      Object.assign(req, { body: { email: 'new@example.com' } });
+      await handlers.createUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(403);
+      expect(json).toHaveBeenCalledWith({ error: 'Domain not allowed' });
+    });
+  });
+
+  describe('inviteUser', () => {
+    it('returns 409 when the email is already used', async () => {
+      const deps = createDeps({ findUsers: jest.fn().mockResolvedValue([mockUser()]) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status } = createReqRes();
+      Object.assign(req, { body: { email: 'test@example.com' } });
+      await handlers.inviteUser(req, res);
+      expect(status).toHaveBeenCalledWith(409);
+      expect(deps.createInviteToken).not.toHaveBeenCalled();
+    });
+
+    it('returns the invite link without sending email when email is disabled', async () => {
+      const deps = createDeps();
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes();
+      Object.assign(req, { body: { email: 'invitee@example.com' } });
+      await handlers.inviteUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(deps.sendInviteEmail).not.toHaveBeenCalled();
+      expect(json).toHaveBeenCalledWith({
+        email: 'invitee@example.com',
+        inviteLink: 'http://localhost:3080/register?token=invite-token&email=invitee%40example.com',
+        emailSent: false,
+      });
+    });
+
+    it('sends the invite email when the email service is configured', async () => {
+      const deps = createDeps({ emailEnabled: jest.fn().mockReturnValue(true) });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, json } = createReqRes();
+      Object.assign(req, { body: { email: 'invitee@example.com' } });
+      await handlers.inviteUser(req, res);
+
+      expect(deps.sendInviteEmail).toHaveBeenCalledWith({
+        email: 'invitee@example.com',
+        inviteLink: expect.stringContaining('/register?token=invite-token'),
+      });
+      expect(json).toHaveBeenCalledWith(expect.objectContaining({ emailSent: true }));
+    });
+
+    it('surfaces invite token creation failures', async () => {
+      const deps = createDeps({
+        createInviteToken: jest.fn().mockResolvedValue({ message: 'Error creating invite' }),
+      });
+      const handlers = createAdminUsersHandlers(deps);
+      const { req, res, status, json } = createReqRes();
+      Object.assign(req, { body: { email: 'invitee@example.com' } });
+      await handlers.inviteUser(req, res);
+
+      expect(status).toHaveBeenCalledWith(500);
+      expect(json).toHaveBeenCalledWith({ error: 'Error creating invite' });
     });
   });
 });

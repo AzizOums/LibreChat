@@ -10,6 +10,7 @@ import * as ag from './types/agents';
 import * as q from './types/queries';
 import * as sk from './types/skills';
 import * as f from './types/files';
+import * as kb from './kb';
 import * as config from './config';
 import request from './request';
 import * as s from './schemas';
@@ -1162,6 +1163,71 @@ export function deleteGitHubSkillSyncCredential(
   credentialKey: string,
 ): Promise<{ credentialKey: string; deleted: boolean }> {
   return request.delete(endpoints.adminSkillsSyncCredential(credentialKey));
+}
+
+/* Knowledge Base (admin) */
+export function listKbDocuments(params?: kb.TKbDocumentsQuery): Promise<kb.TKbDocumentsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) {
+    searchParams.set('status', params.status);
+  }
+  if (params?.cursor) {
+    searchParams.set('cursor', params.cursor);
+  }
+  if (params?.limit) {
+    searchParams.set('limit', String(params.limit));
+  }
+  const query = searchParams.toString();
+  return request.get(`${endpoints.adminKbDocuments()}${query ? `?${query}` : ''}`);
+}
+
+export function getKbDocument(fileId: string): Promise<kb.TKbDocumentResponse> {
+  return request.get(endpoints.adminKbDocument(fileId));
+}
+
+export function uploadKbDocument(data: FormData): Promise<kb.TKbDocumentResponse> {
+  return request.postMultiPart(endpoints.adminKbDocuments(), data);
+}
+
+export function deleteKbDocument(fileId: string): Promise<{ deleted: boolean; file_id: string }> {
+  return request.delete(endpoints.adminKbDocument(fileId));
+}
+
+export function retryKbDocument(fileId: string): Promise<kb.TKbDocumentResponse> {
+  return request.post(endpoints.adminKbDocumentRetry(fileId));
+}
+
+export function getKbDocumentAccess(fileId: string): Promise<kb.TKbDocumentAccessResponse> {
+  return request.get(endpoints.adminKbDocumentAccess(fileId));
+}
+
+export function setKbGroupAccess(
+  fileId: string,
+  groupId: string,
+): Promise<{ granted: boolean; file_id: string; groupId: string }> {
+  return request.put(endpoints.adminKbDocumentGroup(fileId, groupId), {});
+}
+
+export function removeKbGroupAccess(
+  fileId: string,
+  groupId: string,
+): Promise<{ revoked: boolean; file_id: string; groupId: string }> {
+  return request.delete(endpoints.adminKbDocumentGroup(fileId, groupId));
+}
+
+export function setKbUserOverride(
+  fileId: string,
+  userId: string,
+  allow: boolean,
+): Promise<{ file_id: string; userId: string; allow: boolean }> {
+  return request.put(endpoints.adminKbDocumentUser(fileId, userId), { allow });
+}
+
+export function removeKbUserOverride(
+  fileId: string,
+  userId: string,
+): Promise<{ removed: boolean; file_id: string; userId: string }> {
+  return request.delete(endpoints.adminKbDocumentUser(fileId, userId));
 }
 
 /* Roles */

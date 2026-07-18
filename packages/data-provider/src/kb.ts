@@ -70,6 +70,36 @@ export type TKbChunkMetadata = {
   source?: string;
 };
 
+export type TKbDocumentsQuery = {
+  status?: KbIngestionStatus;
+  cursor?: string;
+  limit?: number;
+};
+
+export type TKbDocumentsResponse = {
+  documents: TKbDocument[];
+  nextCursor?: string;
+};
+
+export type TKbDocumentResponse = {
+  document: TKbDocument;
+};
+
+export type TKbAccessPrincipal = {
+  principalId: string;
+  name?: string;
+  email?: string;
+  avatar?: string;
+  deny: boolean;
+  grantedAt?: string;
+};
+
+export type TKbDocumentAccessResponse = {
+  file_id: string;
+  groups: TKbAccessPrincipal[];
+  users: TKbAccessPrincipal[];
+};
+
 export type TKbSearchResult = {
   file_id: string;
   filename: string;
