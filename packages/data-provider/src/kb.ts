@@ -100,6 +100,33 @@ export type TKbDocumentAccessResponse = {
   users: TKbAccessPrincipal[];
 };
 
+export type TAdminUserSummary = {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  avatar: string;
+  role: string;
+  provider: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TAdminCreateUserRequest = {
+  email: string;
+  name?: string;
+  username?: string;
+  password?: string;
+  role?: 'USER' | 'ADMIN';
+  emailVerified?: boolean;
+};
+
+export type TAdminInviteUserResponse = {
+  email: string;
+  inviteLink: string;
+  emailSent: boolean;
+};
+
 export type TKbSearchResult = {
   file_id: string;
   filename: string;

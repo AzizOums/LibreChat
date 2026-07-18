@@ -1165,6 +1165,17 @@ export function deleteGitHubSkillSyncCredential(
   return request.delete(endpoints.adminSkillsSyncCredential(credentialKey));
 }
 
+/* Admin users */
+export function createAdminUser(
+  payload: kb.TAdminCreateUserRequest,
+): Promise<{ user: kb.TAdminUserSummary }> {
+  return request.post(endpoints.adminUsers(), payload);
+}
+
+export function inviteAdminUser(email: string): Promise<kb.TAdminInviteUserResponse> {
+  return request.post(endpoints.adminUsersInvite(), { email });
+}
+
 /* Knowledge Base (admin) */
 export function listKbDocuments(params?: kb.TKbDocumentsQuery): Promise<kb.TKbDocumentsResponse> {
   const searchParams = new URLSearchParams();

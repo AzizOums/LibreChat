@@ -41,6 +41,11 @@ const loadSkillsView = () =>
     Component: m.default,
   }));
 
+const loadKbView = () =>
+  import('~/components/Kb').then((m) => ({
+    Component: m.default,
+  }));
+
 const loadProjectsView = () =>
   import('~/components/Projects').then((m) => ({
     Component: m.ProjectsView,
@@ -145,6 +150,10 @@ export const router = createBrowserRouter(
             {
               path: 'prompts/:promptId',
               lazy: loadInlinePromptsView,
+            },
+            {
+              path: 'kb',
+              lazy: loadKbView,
             },
             {
               path: 'skills',

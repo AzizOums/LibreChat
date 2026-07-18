@@ -445,6 +445,10 @@ export const toolFavorites = () => `${BASE_URL}/api/user/settings/favorites/tool
 export const toolFavorite = (itemType: string, itemId: string) =>
   `${toolFavorites()}/${itemType}/${encodeURIComponent(itemId)}`;
 
+/* Admin users */
+export const adminUsers = () => `${BASE_URL}/api/admin/users`;
+export const adminUsersInvite = () => `${adminUsers()}/invite`;
+
 /* Knowledge Base (admin) */
 export const adminKb = () => `${BASE_URL}/api/admin/kb`;
 export const adminKbDocuments = () => `${adminKb()}/documents`;
