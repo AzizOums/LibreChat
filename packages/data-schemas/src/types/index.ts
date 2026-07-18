@@ -29,6 +29,8 @@ export * from './prompts';
 /* Skills */
 export * from './skill';
 export * from './skillSync';
+/* Knowledge Base */
+export * from './kbDocument';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';

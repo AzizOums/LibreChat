@@ -21,7 +21,9 @@ const {
   GenerationJobManager,
   QUERY_DEVTOOLS_HEADER,
   createStreamServices,
+  createKbWorker,
   deleteAgentCheckpoint,
+  ensureKbSchema,
   initializeFileStorage,
   initializeDeploymentSkills,
   loadToolApprovalHooks,
@@ -34,6 +36,9 @@ const { connectDb, indexSync } = require('~/db');
 const {
   updateAccessPermissions,
   sweepOrphanedPreviews,
+  claimNextPendingKbDocument,
+  updateKbIngestion,
+  resetStalledKbDocuments,
   getRoleByName,
   seedDatabase,
 } = require('~/models');
@@ -127,6 +132,24 @@ const startServer = async () => {
   }
 
   await runAsSystem(seedDatabase);
+  if (isEnabled(process.env.KB_ENABLED)) {
+    try {
+      await ensureKbSchema();
+      const kbWorker = createKbWorker({
+        claimNextPendingKbDocument,
+        updateKbIngestion,
+        resetStalledKbDocuments,
+      });
+      runAsSystem(() => kbWorker.start()).catch((err) => {
+        logger.error('[kb] Ingestion worker failed to start:', err);
+      });
+    } catch (err) {
+      logger.error(
+        '[kb] pgvector schema initialization failed — Knowledge Base features are unavailable:',
+        err,
+      );
+    }
+  }
   /* Recover stuck `status: 'pending'` records from a crash mid-render.
    * `runAsSystem` is required — `File` is tenant-isolated and strict
    * mode rejects unscoped queries. Lazy sweep in the preview endpoint
@@ -265,6 +288,7 @@ const startServer = async () => {
   app.use('/api/admin/config', routes.adminConfig);
   app.use('/api/admin/grants', routes.adminGrants);
   app.use('/api/admin/groups', routes.adminGroups);
+  app.use('/api/admin/kb', routes.adminKb);
   app.use('/api/admin/roles', routes.adminRoles);
   app.use('/api/admin/skills', routes.adminSkills);
   app.use('/api/admin/users', routes.adminUsers);

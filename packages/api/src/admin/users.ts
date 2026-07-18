@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { randomBytes } from 'crypto';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
 import { logger, isValidObjectIdString } from '@librechat/data-schemas';
 import type {
@@ -14,8 +15,28 @@ import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
 
 const MAX_SEARCH_LENGTH = 200;
+const MAX_EMAIL_LENGTH = 500;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const USER_LIST_FIELDS = '_id name username email avatar role provider createdAt updatedAt';
+
+interface CreateUserBody {
+  email?: unknown;
+  password?: unknown;
+  name?: unknown;
+  username?: unknown;
+  role?: unknown;
+  emailVerified?: unknown;
+}
+
+interface InviteUserBody {
+  email?: unknown;
+}
+
+export interface RegisterUserResult {
+  status: number;
+  message: string;
+}
 
 export interface AdminUsersDeps {
   findUsers: (
@@ -40,14 +61,47 @@ export interface AdminUsersDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<void>;
+  registerUser: (
+    user: { email: string; password: string; name: string; username?: string },
+    additionalData?: Partial<IUser>,
+  ) => Promise<RegisterUserResult>;
+  createInviteToken: (email: string) => Promise<string | { message: string }>;
+  emailEnabled: () => boolean;
+  sendInviteEmail: (params: { email: string; inviteLink: string }) => Promise<void>;
+  /** Base client URL used to build invite links (e.g. process.env.DOMAIN_CLIENT). */
+  clientDomain: string;
 }
 
 export function createAdminUsersHandlers(deps: AdminUsersDeps): {
   listUsers: (req: ServerRequest, res: Response) => Promise<Response>;
   searchUsers: (req: ServerRequest, res: Response) => Promise<Response>;
+  createUser: (req: ServerRequest, res: Response) => Promise<Response>;
+  inviteUser: (req: ServerRequest, res: Response) => Promise<Response>;
   deleteUser: (req: ServerRequest, res: Response) => Promise<Response>;
 } {
-  const { findUsers, countUsers, deleteUserById, deleteConfig, deleteAclEntries } = deps;
+  const {
+    findUsers,
+    countUsers,
+    deleteUserById,
+    deleteConfig,
+    deleteAclEntries,
+    registerUser,
+    createInviteToken,
+    emailEnabled,
+    sendInviteEmail,
+    clientDomain,
+  } = deps;
+
+  function validateEmail(email: unknown): string | null {
+    if (typeof email !== 'string') {
+      return null;
+    }
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || trimmed.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.test(trimmed)) {
+      return null;
+    }
+    return trimmed;
+  }
 
   async function listUsersHandler(req: ServerRequest, res: Response) {
     try {
@@ -125,6 +179,104 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     }
   }
 
+  async function createUserHandler(req: ServerRequest, res: Response) {
+    try {
+      const body = (req.body ?? {}) as CreateUserBody;
+      const email = validateEmail(body.email);
+      if (!email) {
+        return res.status(400).json({ error: 'A valid email is required' });
+      }
+      if (body.role != null && body.role !== SystemRoles.USER && body.role !== SystemRoles.ADMIN) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+      if (body.password != null && typeof body.password !== 'string') {
+        return res.status(400).json({ error: 'Invalid password' });
+      }
+
+      const [existing] = await findUsers({ email }, '_id', { limit: 1 });
+      if (existing) {
+        return res.status(409).json({ error: 'A user with this email already exists' });
+      }
+
+      const name =
+        typeof body.name === 'string' && body.name.trim() ? body.name.trim() : email.split('@')[0];
+      const username = typeof body.username === 'string' ? body.username.trim() : '';
+      const password =
+        typeof body.password === 'string' && body.password
+          ? body.password
+          : randomBytes(24).toString('base64url');
+
+      const result = await registerUser(
+        { email, password, name, username },
+        {
+          role: (body.role as IUser['role']) ?? SystemRoles.USER,
+          emailVerified: body.emailVerified !== false,
+        },
+      );
+
+      if (result.status !== 200) {
+        return res.status(result.status).json({ error: result.message });
+      }
+
+      const [user] = await findUsers({ email }, USER_LIST_FIELDS, { limit: 1 });
+      if (!user) {
+        return res.status(500).json({ error: 'User creation could not be confirmed' });
+      }
+
+      const created: AdminUserListItem = {
+        id: user._id?.toString() ?? '',
+        name: user.name ?? '',
+        username: user.username ?? '',
+        email: user.email ?? '',
+        avatar: user.avatar ?? '',
+        role: user.role ?? 'USER',
+        provider: user.provider ?? 'local',
+        createdAt: user.createdAt?.toISOString(),
+        updatedAt: user.updatedAt?.toISOString(),
+      };
+      return res.status(201).json({ user: created });
+    } catch (error) {
+      logger.error('[adminUsers] createUser error:', error);
+      return res.status(500).json({ error: 'Failed to create user' });
+    }
+  }
+
+  async function inviteUserHandler(req: ServerRequest, res: Response) {
+    try {
+      const body = (req.body ?? {}) as InviteUserBody;
+      const email = validateEmail(body.email);
+      if (!email) {
+        return res.status(400).json({ error: 'A valid email is required' });
+      }
+
+      const [existing] = await findUsers({ email }, '_id', { limit: 1 });
+      if (existing) {
+        return res.status(409).json({ error: 'A user with this email already exists' });
+      }
+
+      const token = await createInviteToken(email);
+      if (typeof token !== 'string') {
+        return res.status(500).json({ error: token.message });
+      }
+
+      const inviteLink = `${clientDomain}/register?token=${token}&email=${encodeURIComponent(email)}`;
+      let emailSent = false;
+      if (emailEnabled()) {
+        try {
+          await sendInviteEmail({ email, inviteLink });
+          emailSent = true;
+        } catch (error) {
+          logger.error('[adminUsers] inviteUser email send failed:', error);
+        }
+      }
+
+      return res.status(201).json({ email, inviteLink, emailSent });
+    } catch (error) {
+      logger.error('[adminUsers] inviteUser error:', error);
+      return res.status(500).json({ error: 'Failed to invite user' });
+    }
+  }
+
   async function deleteUserHandler(req: ServerRequest, res: Response) {
     try {
       const { id } = req.params as { id: string };
@@ -183,6 +335,8 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
   return {
     listUsers: listUsersHandler,
     searchUsers: searchUsersHandler,
+    createUser: createUserHandler,
+    inviteUser: inviteUserHandler,
     deleteUser: deleteUserHandler,
   };
 }

@@ -13,6 +13,7 @@ import { createAccessRoleModel } from './accessRole';
 import { createToolFavoriteModel } from './favorite';
 import { createMCPServerModel } from './mcpServer';
 import { createAssistantModel } from './assistant';
+import { createKbDocumentModel } from './kbDocument';
 import { createSkillFileModel } from './skillFile';
 import { createConversationModel } from './convo';
 import { createToolCallModel } from './toolCall';
@@ -77,6 +78,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
   AuditLog: ReturnType<typeof createAuditLogModel>;
   Group: ReturnType<typeof createGroupModel>;
   Config: ReturnType<typeof createConfigModel>;
+  KbDocument: ReturnType<typeof createKbDocumentModel>;
 } {
   return {
     User: createUserModel(mongoose),
@@ -116,5 +118,6 @@ export function createModels(mongoose: typeof import('mongoose')): {
     AuditLog: createAuditLogModel(mongoose),
     Group: createGroupModel(mongoose),
     Config: createConfigModel(mongoose),
+    KbDocument: createKbDocumentModel(mongoose),
   };
 }

@@ -6,6 +6,7 @@ const {
   createSafeUser,
   mcpToolPattern,
   loadWebSearchAuth,
+  createKbSearchTool,
   buildInlineMemoryTool,
   getCodeApiAuthHeaders,
   buildImageToolContext,
@@ -54,7 +55,14 @@ const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { getMCPServerTools, checkCapability } = require('~/server/services/Config');
 const { getMCPServersRegistry } = require('~/config');
-const { getRoleByName, setMemory, deleteMemory, getFormattedMemories } = require('~/models');
+const {
+  getRoleByName,
+  setMemory,
+  deleteMemory,
+  getFormattedMemories,
+  getUserGroups,
+  findAccessibleKbFileIds,
+} = require('~/models');
 
 /**
  * Validates the availability and authentication of tools for a user based on environment variables or user-specific plugin authentication values.
@@ -347,6 +355,30 @@ const loadTools = async ({
           userId: user,
           files,
           entity_id: agent?.id,
+          fileCitations,
+        });
+      };
+      continue;
+    } else if (tool === Tools.kb_search) {
+      requestedTools[tool] = async () => {
+        let fileCitations = false;
+        if (options.req?.user != null) {
+          try {
+            fileCitations = await checkAccess({
+              user: options.req.user,
+              permissionType: PermissionTypes.FILE_CITATIONS,
+              permissions: [Permissions.USE],
+              getRoleByName,
+            });
+          } catch (error) {
+            logger.error('[handleTools] FILE_CITATIONS permission check failed:', error);
+            fileCitations = false;
+          }
+        }
+        return createKbSearchTool({
+          userId: user,
+          getUserGroups,
+          findAccessibleKbFileIds,
           fileCitations,
         });
       };

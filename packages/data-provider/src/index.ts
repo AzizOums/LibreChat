@@ -32,6 +32,7 @@ export * from './types/web';
 export * from './types/graph';
 /* access permissions */
 export * from './accessPermissions';
+export * from './kb';
 /* query/mutation keys */
 export * from './keys';
 /* api call helpers */

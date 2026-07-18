@@ -29,6 +29,7 @@ const {
   buildMCPAuthRunStepCompletedEvent,
   isFileAuthoringToolDefinition,
   ASK_USER_QUESTION_TOOL_NAME,
+  isEnabled,
 } = require('@librechat/api');
 const {
   Time,
@@ -511,6 +512,7 @@ async function processRequiredActions(client, requiredActions) {
 const nativeTools = new Set([
   Tools.execute_code,
   Tools.file_search,
+  Tools.kb_search,
   Tools.web_search,
   Tools.memory,
 ]);
@@ -570,6 +572,9 @@ async function loadToolDefinitionsWrapper({ req, res, agent, streamId = null, to
   const filteredTools = agent.tools?.filter((tool) => {
     if (tool === Tools.file_search) {
       return checkCapability(AgentCapabilities.file_search);
+    }
+    if (tool === Tools.kb_search) {
+      return isEnabled(process.env.KB_ENABLED);
     }
     if (tool === Tools.execute_code) {
       return checkCapability(AgentCapabilities.execute_code);
@@ -1130,6 +1135,8 @@ async function loadAgentTools({
   const _agentTools = agent.tools?.filter((tool) => {
     if (tool === Tools.file_search) {
       return checkCapability(AgentCapabilities.file_search);
+    } else if (tool === Tools.kb_search) {
+      return isEnabled(process.env.KB_ENABLED);
     } else if (tool === Tools.execute_code) {
       return checkCapability(AgentCapabilities.execute_code);
     } else if (tool === Tools.web_search) {

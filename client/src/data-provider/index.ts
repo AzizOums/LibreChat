@@ -4,6 +4,7 @@ export * from './Endpoints';
 export * from './Skills';
 export * from './Files';
 /* Memories */
+export * from './Kb';
 export * from './Memories';
 export * from './Messages';
 export * from './Misc';

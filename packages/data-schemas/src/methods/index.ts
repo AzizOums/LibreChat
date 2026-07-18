@@ -25,6 +25,7 @@ import { createPluginAuthMethods, type PluginAuthMethods } from './pluginAuth';
 import { createAccessRoleMethods, type AccessRoleMethods } from './accessRole';
 import { createUserGroupMethods, type UserGroupMethods, type UserGroupDeps } from './userGroup';
 import { createAclEntryMethods, permissionBitSupersets, type AclEntryMethods } from './aclEntry';
+import { createKbDocumentMethods, type KbDocumentMethods } from './kbDocument';
 import { createSystemGrantMethods, type SystemGrantMethods } from './systemGrant';
 import {
   createAuditLogMethods,
@@ -131,6 +132,7 @@ export type AllMethods = UserMethods &
   MCPServerMethods &
   UserGroupMethods &
   AclEntryMethods &
+  KbDocumentMethods &
   SystemGrantMethods &
   AuditLogMethods &
   ShareMethods &
@@ -261,6 +263,7 @@ export function createMethods(
     ...createAccessRoleMethods(mongoose),
     ...createUserGroupMethods(mongoose, userGroupDeps),
     ...aclEntryMethods,
+    ...createKbDocumentMethods(mongoose),
     ...systemGrantMethods,
     ...createAuditLogMethods(mongoose),
     ...createShareMethods(mongoose),
@@ -306,6 +309,7 @@ export type {
   MCPServerMethods,
   UserGroupMethods,
   AclEntryMethods,
+  KbDocumentMethods,
   SystemGrantMethods,
   AuditLogMethods,
   ShareMethods,
