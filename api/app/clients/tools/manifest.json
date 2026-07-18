@@ -98,6 +98,13 @@
     "authConfig": []
   },
   {
+    "name": "Knowledge Base Search",
+    "pluginKey": "kb_search",
+    "description": "Semantic search over the organization's knowledge base. Results are always filtered by the current user's document access rights.",
+    "agentsOnly": true,
+    "authConfig": []
+  },
+  {
     "name": "Stable Diffusion",
     "pluginKey": "stable-diffusion",
     "description": "Generate photo-realistic images given any text input.",

@@ -7,3 +7,4 @@ export * from './extract';
 export * from './splitter';
 export * from './embeddings';
 export * from './worker';
+export * from './tool';

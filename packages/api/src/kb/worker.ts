@@ -62,6 +62,7 @@ async function ingestKbDocument(document: IKbDocument, deps: KbWorkerDeps): Prom
       chunkIndex: i + j,
       content,
       embedding: embeddings[j],
+      metadata: { source: document.filename },
     }));
     await insertKbChunks(fileId, rows);
     await deps.updateKbIngestion(fileId, {
