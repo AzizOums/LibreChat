@@ -21,6 +21,7 @@ const {
   GenerationJobManager,
   QUERY_DEVTOOLS_HEADER,
   createStreamServices,
+  createKbWorker,
   deleteAgentCheckpoint,
   ensureKbSchema,
   initializeFileStorage,
@@ -35,6 +36,9 @@ const { connectDb, indexSync } = require('~/db');
 const {
   updateAccessPermissions,
   sweepOrphanedPreviews,
+  claimNextPendingKbDocument,
+  updateKbIngestion,
+  resetStalledKbDocuments,
   getRoleByName,
   seedDatabase,
 } = require('~/models');
@@ -131,6 +135,14 @@ const startServer = async () => {
   if (isEnabled(process.env.KB_ENABLED)) {
     try {
       await ensureKbSchema();
+      const kbWorker = createKbWorker({
+        claimNextPendingKbDocument,
+        updateKbIngestion,
+        resetStalledKbDocuments,
+      });
+      runAsSystem(() => kbWorker.start()).catch((err) => {
+        logger.error('[kb] Ingestion worker failed to start:', err);
+      });
     } catch (err) {
       logger.error(
         '[kb] pgvector schema initialization failed — Knowledge Base features are unavailable:',

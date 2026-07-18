@@ -3,6 +3,7 @@ import {
   PrincipalType,
   PrincipalModel,
   PermissionBits,
+  KbIngestionStage,
   KbIngestionStatus,
 } from 'librechat-data-provider';
 import type { Model, Types, ClientSession, DeleteResult } from 'mongoose';
@@ -48,6 +49,8 @@ export function createKbDocumentMethods(mongoose: typeof import('mongoose')): {
   findKbDocumentById: (id: string | Types.ObjectId) => Promise<IKbDocument | null>;
   listKbDocuments: (params?: ListKbDocumentsParams) => Promise<ListKbDocumentsResult>;
   updateKbIngestion: (fileId: string, update: KbIngestionUpdate) => Promise<IKbDocument | null>;
+  claimNextPendingKbDocument: () => Promise<IKbDocument | null>;
+  resetStalledKbDocuments: () => Promise<number>;
   deleteKbDocument: (fileId: string, session?: ClientSession) => Promise<DeleteResult>;
   grantKbGroupAccess: (
     resourceId: string | Types.ObjectId,
@@ -167,6 +170,44 @@ export function createKbDocumentMethods(mongoose: typeof import('mongoose')): {
     return await getKbDocumentModel()
       .findOneAndUpdate({ file_id: fileId }, operations, { new: true })
       .lean<IKbDocument>();
+  }
+
+  /**
+   * Atomically claims the oldest pending document for ingestion by flipping
+   * its status to `processing`. Safe under concurrent workers and multiple
+   * server instances: only one claimer wins each document.
+   */
+  async function claimNextPendingKbDocument(): Promise<IKbDocument | null> {
+    return await getKbDocumentModel()
+      .findOneAndUpdate(
+        { status: KbIngestionStatus.PENDING },
+        {
+          $set: {
+            status: KbIngestionStatus.PROCESSING,
+            progress: { stage: KbIngestionStage.EXTRACTING },
+          },
+        },
+        { sort: { _id: 1 }, new: true },
+      )
+      .lean<IKbDocument>();
+  }
+
+  /**
+   * Requeues documents left in `processing` by a crashed or restarted server.
+   * Chunk writes are idempotent upserts keyed on `(file_id, chunk_index)`, so
+   * re-running an interrupted ingestion is safe.
+   */
+  async function resetStalledKbDocuments(): Promise<number> {
+    const result = await getKbDocumentModel().updateMany(
+      { status: KbIngestionStatus.PROCESSING },
+      {
+        $set: {
+          status: KbIngestionStatus.PENDING,
+          progress: { stage: KbIngestionStage.UPLOADED },
+        },
+      },
+    );
+    return result.modifiedCount;
   }
 
   /**
@@ -362,6 +403,8 @@ export function createKbDocumentMethods(mongoose: typeof import('mongoose')): {
     findKbDocumentById,
     listKbDocuments,
     updateKbIngestion,
+    claimNextPendingKbDocument,
+    resetStalledKbDocuments,
     deleteKbDocument,
     grantKbGroupAccess,
     revokeKbGroupAccess,

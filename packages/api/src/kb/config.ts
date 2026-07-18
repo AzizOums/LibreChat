@@ -19,10 +19,17 @@ export interface KbChunkingConfig {
   chunkOverlap: number;
 }
 
+export interface KbWorkerConfig {
+  concurrency: number;
+  pollIntervalMs: number;
+  embeddingBatchSize: number;
+}
+
 export interface KbConfig {
   db: KbDbConfig;
   embeddings: KbEmbeddingsConfig;
   chunking: KbChunkingConfig;
+  worker: KbWorkerConfig;
 }
 
 function parseIntEnv(value: string | undefined, fallback: number): number {
@@ -56,6 +63,11 @@ export function getKbConfig(): KbConfig {
     chunking: {
       chunkSize: parseIntEnv(process.env.KB_CHUNK_SIZE, 1000),
       chunkOverlap: parseIntEnv(process.env.KB_CHUNK_OVERLAP, 200),
+    },
+    worker: {
+      concurrency: parseIntEnv(process.env.KB_WORKER_CONCURRENCY, 2),
+      pollIntervalMs: parseIntEnv(process.env.KB_WORKER_POLL_MS, 5000),
+      embeddingBatchSize: parseIntEnv(process.env.KB_EMBEDDINGS_BATCH, 32),
     },
   };
 }
