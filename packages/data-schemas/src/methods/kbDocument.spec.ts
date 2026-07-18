@@ -230,6 +230,51 @@ describe('KB hybrid access resolution', () => {
     expect(resourceIds.map(String)).toEqual([String(document._id)]);
   });
 
+  it('a user removed from a group immediately loses group-granted access', async () => {
+    const document = await createCompletedDocument('doc-left-group');
+    await methods.grantKbGroupAccess(document._id, hrGroupId, adminId);
+
+    const before = await methods.findAccessibleKbFileIds({ userId, groupIds: [hrGroupId] });
+    expect(before).toEqual(['doc-left-group']);
+
+    const after = await methods.findAccessibleKbFileIds({ userId, groupIds: [] });
+    expect(after).toEqual([]);
+  });
+
+  it('a deny blocks access even when the document is granted to several of the user groups', async () => {
+    const document = await createCompletedDocument('doc-deny-multi');
+    await methods.grantKbGroupAccess(document._id, hrGroupId, adminId);
+    await methods.grantKbGroupAccess(document._id, salesGroupId, adminId);
+    await methods.setKbUserOverride(document._id, userId, false, adminId);
+
+    const fileIds = await methods.findAccessibleKbFileIds({
+      userId,
+      groupIds: [hrGroupId, salesGroupId],
+    });
+    expect(fileIds).toEqual([]);
+  });
+
+  it('claims pending documents atomically and requeues stalled ones', async () => {
+    await methods.createKbDocument({
+      file_id: 'doc-claim',
+      filename: 'doc.pdf',
+      type: 'application/pdf',
+      bytes: 10,
+    });
+
+    const claimed = await methods.claimNextPendingKbDocument();
+    expect(claimed?.file_id).toBe('doc-claim');
+    expect(claimed?.status).toBe(KbIngestionStatus.PROCESSING);
+
+    const second = await methods.claimNextPendingKbDocument();
+    expect(second).toBeNull();
+
+    const requeued = await methods.resetStalledKbDocuments();
+    expect(requeued).toBe(1);
+    const reclaimed = await methods.claimNextPendingKbDocument();
+    expect(reclaimed?.file_id).toBe('doc-claim');
+  });
+
   it('deny entries carry permBits 0 and never match bitwise grant queries', async () => {
     const document = await createCompletedDocument('doc-bits');
     await methods.setKbUserOverride(document._id, userId, false, adminId);
